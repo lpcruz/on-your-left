@@ -1,0 +1,284 @@
+/**
+ * Route discovery — finds real parks and running areas via OpenStreetMap,
+ * then uses Strava segment data within those areas purely for crowd calibration.
+ * Strava segments are never surfaced directly as routes.
+ */
+import supabase from '../db/client.js';
+import { invalidateCache } from '../routes/routeStore.js';
+
+// ─── Strava token management ──────────────────────────────────────────────────
+
+const CLIENT_ID     = process.env.STRAVA_CLIENT_ID;
+const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
+const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN;
+
+let accessToken = null;
+let tokenExpiresAt = 0;
+
+async function getAccessToken() {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) return null;
+  if (accessToken && Date.now() / 1000 < tokenExpiresAt - 60) return accessToken;
+
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      refresh_token: REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await res.json();
+  if (!data.access_token) return null;
+  accessToken = data.access_token;
+  tokenExpiresAt = data.expires_at;
+  return accessToken;
+}
+
+async function stravaGet(path, params = {}) {
+  const token = await getAccessToken();
+  if (!token) throw new Error('No Strava token');
+  const url = new URL(`https://www.strava.com/api/v3${path}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Strava ${res.status}`);
+  return res.json();
+}
+
+// Parks are now supplied by the frontend via Mapbox Search Box API.
+// No external API calls needed here for discovery.
+
+// ─── Strava popularity within a park ─────────────────────────────────────────
+// Queries Strava segments inside the park bbox and aggregates their stats
+// to produce a single popularity score — never exposes segments as routes.
+
+async function getParkPopularity(lat, lng) {
+  const R = 0.009; // ~0.6 mile bounding box
+  const bounds = [lat - R, lng - R, lat + R, lng + R].join(',');
+
+  try {
+    const data = await stravaGet('/segments/explore', { bounds, activity_type: 'running' });
+    const segments = data.segments ?? [];
+    if (!segments.length) return { score: 0, athleteCount: 0 };
+
+    let totalAthletes = 0, totalEfforts = 0, totalStars = 0;
+
+    for (const seg of segments.slice(0, 4)) {
+      try {
+        const detail = await stravaGet(`/segments/${seg.id}`);
+        totalAthletes += detail.athlete_count ?? 0;
+        totalEfforts  += detail.effort_count  ?? seg.effort_count ?? 0;
+        totalStars    += detail.star_count     ?? 0;
+      } catch {
+        totalEfforts += seg.effort_count ?? 0;
+      }
+      await sleep(150);
+    }
+
+    return {
+      score: computePopularityScore({ effort_count: totalEfforts, athlete_count: totalAthletes, star_count: totalStars }),
+      athleteCount: totalAthletes,
+    };
+  } catch {
+    return { score: 0, athleteCount: 0 };
+  }
+}
+
+// ─── Segment type from OSM park tags ─────────────────────────────────────────
+
+function parkSegmentType(park) {
+  const cat = (park.category ?? '').toLowerCase();
+  if (cat.includes('track')) return 'sprint';
+  if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail')) return 'hill';
+  return 'route';
+}
+
+// ─── Popularity score ─────────────────────────────────────────────────────────
+
+export function computePopularityScore({ effort_count = 0, athlete_count = 0, star_count = 0 }) {
+  const diversity = effort_count > 0 ? athlete_count / effort_count : 0.5;
+  return athlete_count * (1 + diversity) + star_count * 20;
+}
+
+// ─── Time-of-day curves ───────────────────────────────────────────────────────
+
+const CURVES = {
+  route: (isWeekend, isSat, h) => {
+    if (h < 5 || h >= 22) return 0;
+    if (isWeekend) {
+      if (isSat) {
+        if (h >= 7 && h <= 10) return 1.0;
+        if (h === 6 || (h >= 11 && h <= 13)) return 0.65;
+        if (h >= 14 && h <= 19) return 0.50;
+        return 0.20;
+      }
+      if (h >= 8 && h <= 11) return 0.90;
+      if (h >= 12 && h <= 17) return 0.55;
+      if (h >= 18 && h <= 20) return 0.40;
+      return 0.20;
+    }
+    if (h >= 6  && h <= 8)  return 0.50;
+    if (h >= 9  && h <= 11) return 0.25;
+    if (h >= 12 && h <= 13) return 0.35;
+    if (h >= 14 && h <= 16) return 0.30;
+    if (h >= 17 && h <= 19) return 0.65;
+    if (h >= 20 && h <= 21) return 0.30;
+    return 0.10;
+  },
+  hill: (isWeekend, _isSat, h) => {
+    if (h < 5 || h >= 21) return 0;
+    if (isWeekend) {
+      if (h >= 6 && h <= 9)   return 1.0;
+      if (h >= 10 && h <= 12) return 0.50;
+      if (h >= 13 && h <= 16) return 0.25;
+      if (h >= 17 && h <= 19) return 0.35;
+      return 0.10;
+    }
+    if (h >= 5 && h <= 7)   return 0.65;
+    if (h >= 8 && h <= 9)   return 0.35;
+    if (h >= 17 && h <= 19) return 0.55;
+    if (h >= 20)            return 0.20;
+    return 0.10;
+  },
+  sprint: (isWeekend, _isSat, h) => {
+    if (h < 6 || h >= 21) return 0;
+    if (isWeekend) {
+      if (h >= 7 && h <= 10)  return 1.0;
+      if (h >= 11 && h <= 13) return 0.45;
+      if (h >= 14 && h <= 17) return 0.30;
+      return 0.15;
+    }
+    if (h >= 6 && h <= 8)   return 0.35;
+    if (h >= 17 && h <= 19) return 0.50;
+    return 0.10;
+  },
+};
+
+function timeIntensity(day, hour, type = 'route') {
+  const isWeekend = day === 0 || day === 6;
+  const isSat = day === 6;
+  return (CURVES[type] ?? CURVES.route)(isWeekend, isSat, hour);
+}
+
+function intensityToStatus(intensity, popularityScore) {
+  if (intensity <= 0.05) return 'empty';
+  const tier = Math.min(1, Math.log10(Math.max(1, popularityScore)) / 6);
+  const modThreshold    = 0.30 - tier * 0.15;
+  const packedThreshold = 0.80 - tier * 0.15;
+  if (intensity < modThreshold) return 'empty';
+  if (intensity < packedThreshold) return 'moderate';
+  return 'packed';
+}
+
+function buildTypicalRows(routeId, popularityScore, type = 'route') {
+  const rows = [];
+  for (let day = 0; day <= 6; day++) {
+    for (let hour = 0; hour <= 23; hour++) {
+      rows.push({
+        route_id: routeId,
+        day_of_week: day,
+        hour_of_day: hour,
+        status: intensityToStatus(timeIntensity(day, hour, type), popularityScore),
+      });
+    }
+  }
+  return rows;
+}
+
+// ─── Color palette ────────────────────────────────────────────────────────────
+
+const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ec4899','#8b5cf6','#ef4444','#14b8a6'];
+let colorIdx = 0;
+function nextColor() { return COLORS[colorIdx++ % COLORS.length]; }
+
+// ─── Main discovery function ──────────────────────────────────────────────────
+
+// frontendParks: [{ name, lat, lng, category, address, mapboxId }]
+export async function discoverRoutes(lat, lng, frontendParks = []) {
+  const parks = frontendParks;
+  if (!parks.length) return [];
+
+  const discovered = [];
+
+  for (const park of parks.slice(0, 8)) {
+    const routeId = `mb-${park.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 46)}`;
+
+    // Always refresh popularity / re-seed typical_crowds
+    const { score: popularityScore, athleteCount } = await getParkPopularity(park.lat, park.lng);
+    const type = parkSegmentType(park);
+    const typicalRows = buildTypicalRows(routeId, popularityScore, type);
+
+    await supabase
+      .from('typical_crowds')
+      .upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });
+
+    // Check if already in DB
+    const { data: existing } = await supabase
+      .from('routes')
+      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color')
+      .eq('id', routeId)
+      .single();
+
+    if (existing) {
+      discovered.push({
+        id: existing.id,
+        name: existing.name,
+        shortName: existing.short_name,
+        description: existing.description,
+        location: existing.location,
+        center: [existing.center_lng, existing.center_lat],
+        zoom: existing.zoom,
+        color: existing.color,
+        discovered: true,
+      });
+      continue;
+    }
+
+    const city = park.address ?? '';
+    const runnerLabel = athleteCount > 0 ? `${athleteCount.toLocaleString()} Strava runners` : null;
+    const description = [
+      park.category === 'running_track' ? 'Running track' : 'Park',
+      runnerLabel,
+    ].filter(Boolean).join(' · ');
+
+    const routeRow = {
+      id: routeId,
+      name: park.name,
+      short_name: park.name.length > 22 ? park.name.slice(0, 20) + '…' : park.name,
+      description,
+      location: city || 'Discovered route',
+      center_lng: park.lng,
+      center_lat: park.lat,
+      zoom: 15,
+      color: nextColor(),
+      active: true,
+    };
+
+    const { error: routeErr } = await supabase.from('routes').insert(routeRow);
+    if (routeErr && routeErr.code !== '23505') {
+      console.warn(`Could not save park route ${routeId}:`, routeErr.message);
+      continue;
+    }
+
+    invalidateCache();
+
+    discovered.push({
+      id: routeId,
+      name: routeRow.name,
+      shortName: routeRow.short_name,
+      description: routeRow.description,
+      location: routeRow.location,
+      center: [park.lng, park.lat],
+      zoom: routeRow.zoom,
+      color: routeRow.color,
+      discovered: true,
+    });
+
+    await sleep(100);
+  }
+
+  return discovered;
+}
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
