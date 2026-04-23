@@ -9,7 +9,6 @@
     "build": "npm run build --prefix frontend",
     "db:setup": "npm run db:setup --prefix backend",
     "db:seed": "npm run db:seed --prefix backend",
-    "routes:seed": "npm run routes:seed --prefix backend",
     "strava:auth": "npm run strava:auth --prefix backend",
     "strava:sync": "npm run strava:sync --prefix backend"
   },

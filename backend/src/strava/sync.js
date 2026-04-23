@@ -14,7 +14,6 @@
  */
 import 'dotenv/config';
 import supabase from '../db/client.js';
-import { ROUTES } from '../routes/routes.js';
 
 const CLIENT_ID     = process.env.STRAVA_CLIENT_ID;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
@@ -215,7 +214,20 @@ async function sync() {
   console.log('\n🏃 on-your-left × Strava sync (segment stats mode)');
   console.log('   Using real effort counts to calibrate crowd levels\n');
 
-  for (const route of ROUTES) {
+  const { data: routes, error } = await supabase
+    .from('routes')
+    .select('id, name, center_lng, center_lat')
+    .eq('active', true);
+
+  if (error) throw error;
+
+  const mapped = routes.map((r) => ({
+    id: r.id,
+    name: r.name,
+    center: [r.center_lng, r.center_lat],
+  }));
+
+  for (const route of mapped) {
     await syncRoute(route);
   }
 
