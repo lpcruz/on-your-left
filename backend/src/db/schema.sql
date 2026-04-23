@@ -1,18 +1,22 @@
 -- on-your-left database schema
 
 CREATE TABLE IF NOT EXISTS routes (
-  id          VARCHAR(50) PRIMARY KEY,
-  name        TEXT        NOT NULL,
-  short_name  TEXT        NOT NULL,
-  description TEXT,
-  location    TEXT,
-  center_lng  DOUBLE PRECISION NOT NULL,
-  center_lat  DOUBLE PRECISION NOT NULL,
-  zoom        SMALLINT    NOT NULL DEFAULT 14,
-  color       VARCHAR(20) NOT NULL DEFAULT '#6366f1',
-  active      BOOLEAN     NOT NULL DEFAULT true,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id             VARCHAR(50) PRIMARY KEY,
+  name           TEXT        NOT NULL,
+  short_name     TEXT        NOT NULL,
+  description    TEXT,
+  location       TEXT,
+  center_lng     DOUBLE PRECISION NOT NULL,
+  center_lat     DOUBLE PRECISION NOT NULL,
+  zoom           SMALLINT    NOT NULL DEFAULT 14,
+  color          VARCHAR(20) NOT NULL DEFAULT '#6366f1',
+  area_sq_miles  DOUBLE PRECISION,
+  active         BOOLEAN     NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: add area_sq_miles to existing tables
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS area_sq_miles DOUBLE PRECISION;
 
 CREATE TABLE IF NOT EXISTS crowd_reports (
   id          SERIAL PRIMARY KEY,

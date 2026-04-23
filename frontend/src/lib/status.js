@@ -1,6 +1,7 @@
 export const STATUS_CONFIG = {
   empty: {
-    label: 'Empty',
+    label: 'Clear',
+    description: 'No one out there — you\'ve got the path to yourself',
     emoji: '🟢',
     color: 'text-green-700 dark:text-green-400',
     bg: 'bg-green-50 dark:bg-green-950',
@@ -11,7 +12,8 @@ export const STATUS_CONFIG = {
     mapColor: '#16a34a',
   },
   moderate: {
-    label: 'Moderate',
+    label: 'Buzzing',
+    description: 'Runners are out — expect to weave and share the path',
     emoji: '🟡',
     color: 'text-amber-700 dark:text-amber-400',
     bg: 'bg-amber-50 dark:bg-amber-950',
@@ -23,6 +25,7 @@ export const STATUS_CONFIG = {
   },
   packed: {
     label: 'Packed',
+    description: 'It\'s crowded — expect to dodge people and slow down',
     emoji: '🔴',
     color: 'text-red-700 dark:text-red-400',
     bg: 'bg-red-50 dark:bg-red-950',

@@ -41,6 +41,24 @@ export async function geocode(query, userCoords = null) {
   return data.features ?? [];
 }
 
+// Estimate park area in sq miles from a [minLng, minLat, maxLng, maxLat] bbox.
+// Falls back to category-based defaults when bbox is unavailable.
+function estimateAreaSqMiles(bbox, category = 'park') {
+  if (bbox && bbox.length === 4) {
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+    const midLat = (minLat + maxLat) / 2;
+    const latMiles = (maxLat - minLat) * 69;
+    const lngMiles = (maxLng - minLng) * 69 * Math.cos((midLat * Math.PI) / 180);
+    const area = latMiles * lngMiles;
+    if (area > 0.001) return area; // only use if bbox is meaningful
+  }
+  // Category-based fallback (sq miles)
+  const cat = (category ?? '').toLowerCase();
+  if (cat.includes('track'))                                    return 0.01;  // ~6 acres
+  if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail')) return 1.5;
+  return 0.3; // typical neighborhood park
+}
+
 // Find parks and recreational areas near a coordinate using Mapbox Search Box API
 export async function findParksNear(lng, lat) {
   if (!MAPBOX_TOKEN) return [];
@@ -57,14 +75,20 @@ export async function findParksNear(lng, lat) {
 
     return (data.features ?? [])
       .filter((f) => f.properties?.name && f.geometry?.coordinates)
-      .map((f) => ({
-        name: f.properties.name,
-        lat: f.geometry.coordinates[1],
-        lng: f.geometry.coordinates[0],
-        mapboxId: f.properties.mapbox_id,
-        category: f.properties.poi_category?.[0] ?? 'park',
-        address: f.properties.place_formatted ?? '',
-      }));
+      .map((f) => {
+        const category = f.properties.poi_category?.[0] ?? 'park';
+        const bbox = f.properties.bbox ?? null;
+        const areaSqMiles = estimateAreaSqMiles(bbox, category);
+        return {
+          name: f.properties.name,
+          lat: f.geometry.coordinates[1],
+          lng: f.geometry.coordinates[0],
+          mapboxId: f.properties.mapbox_id,
+          category,
+          address: f.properties.place_formatted ?? '',
+          areaSqMiles,
+        };
+      });
   } catch {
     return [];
   }

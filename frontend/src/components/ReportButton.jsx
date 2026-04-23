@@ -1,9 +1,9 @@
 import { getStatus } from '../lib/status.js';
 
 const STATUSES = [
-  { value: 'empty', emoji: '🟢', label: 'Empty', sub: 'All clear' },
-  { value: 'moderate', emoji: '🟡', label: 'Moderate', sub: 'Getting busy' },
-  { value: 'packed', emoji: '🔴', label: 'Packed', sub: 'Obstacle course' },
+  { value: 'empty',    emoji: '🟢', label: 'Clear',   sub: 'Path to yourself' },
+  { value: 'moderate', emoji: '🟡', label: 'Buzzing', sub: 'Runners out — expect to share' },
+  { value: 'packed',   emoji: '🔴', label: 'Packed',  sub: 'Crowded — dodge and slow down' },
 ];
 
 export default function ReportButton({ onSubmit, submitting, submitted }) {

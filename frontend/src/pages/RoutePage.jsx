@@ -8,6 +8,14 @@ import RouteMap from '../components/RouteMap.jsx';
 import PopularTimes from '../components/PopularTimes.jsx';
 import Header from '../components/Header.jsx';
 
+function formatParkSize(areaSqMiles) {
+  if (!areaSqMiles) return null;
+  const acres = areaSqMiles * 640;
+  if (acres < 2)   return `~${Math.round(acres * 43560)} sq ft`;
+  if (acres < 100) return `~${Math.round(acres)} acres`;
+  return `~${areaSqMiles.toFixed(1)} sq miles`;
+}
+
 function BreakdownBar({ breakdown }) {
   const total = breakdown.empty + breakdown.moderate + breakdown.packed;
   if (total === 0) return null;
@@ -27,8 +35,8 @@ function BreakdownBar({ breakdown }) {
         )}
       </div>
       <div className="flex justify-between text-xs text-gray-400 dark:text-gray-600 mt-1">
-        <span>{breakdown.empty} empty</span>
-        <span>{breakdown.moderate} moderate</span>
+        <span>{breakdown.empty} clear</span>
+        <span>{breakdown.moderate} buzzing</span>
         <span>{breakdown.packed} packed</span>
       </div>
     </div>
@@ -131,7 +139,10 @@ export default function RoutePage() {
               <p className={`text-3xl font-black mt-1 ${cfg.color}`}>
                 {cfg.emoji} {cfg.label}
               </p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className={`text-sm font-medium mt-0.5 ${cfg.color} opacity-80`}>
+                {cfg.description}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
                 Based on {route.reportCount} {route.reportCount === 1 ? 'report' : 'reports'} in the last hour
               </p>
               {route.breakdown && <BreakdownBar breakdown={route.breakdown} />}
@@ -165,9 +176,23 @@ export default function RoutePage() {
               <dt className="text-gray-500">Location</dt>
               <dd className="text-gray-700 dark:text-gray-300">{route.location}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-500">Description</dt>
-              <dd className="text-gray-700 dark:text-gray-300 text-right ml-4">{route.description}</dd>
+            {route.description && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">About</dt>
+                <dd className="text-gray-700 dark:text-gray-300 text-right ml-4">{route.description}</dd>
+              </div>
+            )}
+            {formatParkSize(route.areaSqMiles) && (
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Park size</dt>
+                <dd className="text-gray-700 dark:text-gray-300">{formatParkSize(route.areaSqMiles)}</dd>
+              </div>
+            )}
+            <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+              <p className="text-xs text-gray-400 dark:text-gray-600 leading-relaxed">
+                Crowd status is relative to this park's size — a small track with 50 runners
+                is far busier than a large park with the same count.
+              </p>
             </div>
           </dl>
         </div>

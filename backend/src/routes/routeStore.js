@@ -20,6 +20,7 @@ function dbRowToRoute(row) {
     center: [row.center_lng, row.center_lat],
     zoom: row.zoom,
     color: row.color,
+    areaSqMiles: row.area_sq_miles ?? null,
   };
 }
 

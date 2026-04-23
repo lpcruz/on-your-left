@@ -101,6 +101,12 @@ export function computePopularityScore({ effort_count = 0, athlete_count = 0, st
   return athlete_count * (1 + diversity) + star_count * 20;
 }
 
+// Density: athletes per sq mile — normalises popularity by park size so a
+// small track with 200 athletes is rated denser than a 50-acre park with the same.
+function computeDensity(popularityScore, areaSqMiles = 0.3) {
+  return popularityScore / Math.max(0.01, areaSqMiles);
+}
+
 // ─── Time-of-day curves ───────────────────────────────────────────────────────
 
 const CURVES = {
@@ -161,9 +167,11 @@ function timeIntensity(day, hour, type = 'route') {
   return (CURVES[type] ?? CURVES.route)(isWeekend, isSat, hour);
 }
 
-function intensityToStatus(intensity, popularityScore) {
+// density = athletes per sq mile; a small park tips packed much sooner than a large one.
+function intensityToStatus(intensity, density) {
   if (intensity <= 0.05) return 'empty';
-  const tier = Math.min(1, Math.log10(Math.max(1, popularityScore)) / 6);
+  // log10(density) / 5 gives a 0–1 tier: density ~10 → 0.2, ~1000 → 0.6, ~100000 → 1.0
+  const tier = Math.min(1, Math.log10(Math.max(1, density)) / 5);
   const modThreshold    = 0.30 - tier * 0.15;
   const packedThreshold = 0.80 - tier * 0.15;
   if (intensity < modThreshold) return 'empty';
@@ -171,7 +179,8 @@ function intensityToStatus(intensity, popularityScore) {
   return 'packed';
 }
 
-function buildTypicalRows(routeId, popularityScore, type = 'route') {
+function buildTypicalRows(routeId, popularityScore, areaSqMiles = 0.3, type = 'route') {
+  const density = computeDensity(popularityScore, areaSqMiles);
   const rows = [];
   for (let day = 0; day <= 6; day++) {
     for (let hour = 0; hour <= 23; hour++) {
@@ -179,7 +188,7 @@ function buildTypicalRows(routeId, popularityScore, type = 'route') {
         route_id: routeId,
         day_of_week: day,
         hour_of_day: hour,
-        status: intensityToStatus(timeIntensity(day, hour, type), popularityScore),
+        status: intensityToStatus(timeIntensity(day, hour, type), density),
       });
     }
   }
@@ -207,7 +216,8 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
     // Always refresh popularity / re-seed typical_crowds
     const { score: popularityScore, athleteCount } = await getParkPopularity(park.lat, park.lng);
     const type = parkSegmentType(park);
-    const typicalRows = buildTypicalRows(routeId, popularityScore, type);
+    const areaSqMiles = park.areaSqMiles ?? 0.3;
+    const typicalRows = buildTypicalRows(routeId, popularityScore, areaSqMiles, type);
 
     await supabase
       .from('typical_crowds')
@@ -230,6 +240,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
         center: [existing.center_lng, existing.center_lat],
         zoom: existing.zoom,
         color: existing.color,
+        areaSqMiles: existing.area_sq_miles ?? areaSqMiles,
         discovered: true,
       });
       continue;
@@ -252,6 +263,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       center_lat: park.lat,
       zoom: 15,
       color: nextColor(),
+      area_sq_miles: areaSqMiles,
       active: true,
     };
 
@@ -272,6 +284,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       center: [park.lng, park.lat],
       zoom: routeRow.zoom,
       color: routeRow.color,
+      areaSqMiles,
       discovered: true,
     });
 

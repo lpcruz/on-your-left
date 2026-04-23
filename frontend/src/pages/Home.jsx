@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { getStatus, STATUS_CONFIG } from '../lib/status.js';
 import { distanceMiles, getCurrentPosition, findParksNear } from '../lib/geo.js';
 import RouteCard from '../components/RouteCard.jsx';
 import SearchBar from '../components/SearchBar.jsx';
@@ -84,6 +85,7 @@ export default function Home() {
   }, []);
 
   const [filter, setFilter] = useState('all'); // 'all' | 'empty' | 'moderate' | 'packed'
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const filteredRoutes = useMemo(() => {
     if (filter === 'all') return routes;
@@ -95,8 +97,8 @@ export default function Home() {
 
   const FILTERS = [
     { id: 'all',      label: 'All' },
-    { id: 'empty',    label: '🟢 Empty now' },
-    { id: 'moderate', label: '🟡 Moderate now' },
+    { id: 'empty',    label: '🟢 Clear now' },
+    { id: 'moderate', label: '🟡 Buzzing now' },
     { id: 'packed',   label: '🔴 Packed now' },
   ];
 
@@ -148,33 +150,62 @@ export default function Home() {
         {/* Filter pills — only show when routes are loaded */}
         {!isLoading && routes.length > 0 && (
           <div className="mb-4">
-          <p className="text-xs text-gray-400 dark:text-gray-600 mb-2">Conditions right now</p>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-            {FILTERS.map(({ id, label }) => {
-              const active = filter === id;
-              const count = id === 'all' ? routes.length : routes.filter((r) => r.status === id).length;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setFilter(id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all touch-manipulation ${
-                    active
-                      ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  {label}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                    active
-                      ? 'bg-white/20 dark:bg-black/20 text-white dark:text-gray-900'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-400 dark:text-gray-600">Conditions right now</p>
+              <button
+                onClick={() => setLegendOpen((o) => !o)}
+                className="text-xs text-blue-500 dark:text-blue-400 hover:underline touch-manipulation"
+              >
+                {legendOpen ? 'Hide' : 'What do these mean?'}
+              </button>
+            </div>
+
+            {legendOpen && (
+              <div className="mb-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
+                {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                  <div key={key} className="flex items-start gap-3 px-4 py-3">
+                    <span className="text-base leading-none mt-0.5">{cfg.emoji}</span>
+                    <div>
+                      <p className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cfg.description}</p>
+                    </div>
+                  </div>
+                ))}
+                <div className="px-4 py-3">
+                  <p className="text-xs text-gray-400 dark:text-gray-600 leading-relaxed">
+                    Status is relative to each park's size. A small track with 50 runners
+                    rates higher than a large park with the same count.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+              {FILTERS.map(({ id, label }) => {
+                const active = filter === id;
+                const count = id === 'all' ? routes.length : routes.filter((r) => r.status === id).length;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setFilter(id)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all touch-manipulation ${
+                      active
+                        ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {label}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      active
+                        ? 'bg-white/20 dark:bg-black/20 text-white dark:text-gray-900'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -201,7 +232,7 @@ export default function Home() {
             : filteredRoutes.length === 0
             ? (
               <div className="text-center py-10 text-gray-400 dark:text-gray-600">
-                <p className="text-sm">No {filter} routes nearby</p>
+                <p className="text-sm">No {filter === 'all' ? '' : getStatus(filter).label.toLowerCase() + ' '}routes nearby</p>
                 <button onClick={() => setFilter('all')} className="mt-2 text-xs text-blue-500 underline">
                   Show all
                 </button>
