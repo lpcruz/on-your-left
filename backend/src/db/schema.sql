@@ -43,6 +43,22 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_strava_athlete_id ON users (strava_athlete_id);
 
+-- Raw Strava activity events matched to routes.
+-- Feeds into typical_crowds over time as real data accumulates.
+CREATE TABLE IF NOT EXISTS strava_runs (
+  id                SERIAL PRIMARY KEY,
+  user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  strava_activity_id BIGINT UNIQUE NOT NULL,
+  route_id          VARCHAR(50) NOT NULL,
+  started_at        TIMESTAMPTZ NOT NULL,  -- actual run start (UTC)
+  elapsed_seconds   INTEGER,
+  distance_meters   DOUBLE PRECISION,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_strava_runs_route_started ON strava_runs (route_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_strava_runs_user ON strava_runs (user_id);
+
 CREATE TABLE IF NOT EXISTS crowd_reports (
   id          SERIAL PRIMARY KEY,
   route_id    VARCHAR(50) NOT NULL,

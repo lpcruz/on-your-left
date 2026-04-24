@@ -9,6 +9,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
+import webhookRouter from './routes/webhook.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,7 @@ app.use(cookieParser());
 
 app.use('/api', apiRouter);
 app.use('/auth', authRouter);
+app.use('/webhook', webhookRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
