@@ -1,0 +1,25 @@
+language: node_js
+node_js:
+  - "18"
+
+cache:
+  directories:
+    - node_modules
+    - frontend/node_modules
+    - backend/node_modules
+
+install:
+  - npm install
+  - npm install --prefix frontend
+  - npm install --prefix backend
+
+script:
+  - npm run build --prefix frontend
+
+deploy:
+  provider: heroku
+  api_key:
+    secure: $HEROKU_API_KEY
+  app: $HEROKU_APP_NAME
+  on:
+    branch: main
