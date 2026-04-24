@@ -167,13 +167,23 @@ function timeIntensity(day, hour, type = 'route') {
   return (CURVES[type] ?? CURVES.route)(isWeekend, isSat, hour);
 }
 
-// density = athletes per sq mile; a small park tips packed much sooner than a large one.
-function intensityToStatus(intensity, density) {
+// Parks with no Strava data (score=0) are unknown — treat them as low-activity
+// so they default toward Clear. Only confirmed running parks tip into Buzzing/Packed.
+function intensityToStatus(intensity, popularityScore, density) {
   if (intensity <= 0.05) return 'empty';
-  // log10(density) / 5 gives a 0–1 tier: density ~10 → 0.2, ~1000 → 0.6, ~100000 → 1.0
+
+  if (popularityScore === 0) {
+    // No Strava data: scale way down so obscure/non-running parks skew Clear
+    const scaled = intensity * 0.25;
+    if (scaled < 0.10) return 'empty';
+    return 'moderate';
+  }
+
+  // Known running park: density sets how aggressively it tips toward Packed
+  // density ~30 → tier 0.3, ~3000 → tier 0.7, ~100000 → tier 1.0
   const tier = Math.min(1, Math.log10(Math.max(1, density)) / 5);
-  const modThreshold    = 0.30 - tier * 0.15;
-  const packedThreshold = 0.80 - tier * 0.15;
+  const modThreshold    = 0.25 - tier * 0.10; // 0.25 → 0.15
+  const packedThreshold = 0.60 - tier * 0.15; // 0.60 → 0.45
   if (intensity < modThreshold) return 'empty';
   if (intensity < packedThreshold) return 'moderate';
   return 'packed';
@@ -188,7 +198,7 @@ function buildTypicalRows(routeId, popularityScore, areaSqMiles = 0.3, type = 'r
         route_id: routeId,
         day_of_week: day,
         hour_of_day: hour,
-        status: intensityToStatus(timeIntensity(day, hour, type), density),
+        status: intensityToStatus(timeIntensity(day, hour, type), popularityScore, density),
       });
     }
   }
