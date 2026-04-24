@@ -15,8 +15,9 @@ CREATE TABLE IF NOT EXISTS routes (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migration: add area_sq_miles to existing tables
+-- Migrations: columns added after initial schema
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS area_sq_miles DOUBLE PRECISION;
+ALTER TABLE routes ADD COLUMN IF NOT EXISTS route_type VARCHAR(20) DEFAULT 'park';
 
 CREATE TABLE IF NOT EXISTS crowd_reports (
   id          SERIAL PRIMARY KEY,

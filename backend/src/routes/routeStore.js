@@ -21,6 +21,7 @@ function dbRowToRoute(row) {
     zoom: row.zoom,
     color: row.color,
     areaSqMiles: row.area_sq_miles ?? null,
+    routeType: row.route_type ?? 'park',
   };
 }
 

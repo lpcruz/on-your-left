@@ -87,11 +87,21 @@ async function getParkPopularity(lat, lng) {
 
 // ─── Segment type from OSM park tags ─────────────────────────────────────────
 
+// Curve type for time-of-day intensity modelling
 function parkSegmentType(park) {
   const cat = (park.category ?? '').toLowerCase();
   if (cat.includes('track')) return 'sprint';
   if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail')) return 'hill';
   return 'route';
+}
+
+// Human-facing route type stored in the DB and shown in the UI
+function parkRouteType(park) {
+  const cat = (park.category ?? '').toLowerCase();
+  const name = (park.name ?? '').toLowerCase();
+  if (cat.includes('track') || name.includes('track')) return 'track';
+  if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail') || name.includes('trail')) return 'trail';
+  return 'park';
 }
 
 // ─── Popularity score ─────────────────────────────────────────────────────────
@@ -226,6 +236,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
     // Always refresh popularity / re-seed typical_crowds
     const { score: popularityScore, athleteCount } = await getParkPopularity(park.lat, park.lng);
     const type = parkSegmentType(park);
+    const routeType = parkRouteType(park);
     const areaSqMiles = park.areaSqMiles ?? 0.3;
     const typicalRows = buildTypicalRows(routeId, popularityScore, areaSqMiles, type);
 
@@ -241,12 +252,12 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       .single();
 
     if (existing) {
-      // Backfill area_sq_miles if the row pre-dates the column
-      if (!existing.area_sq_miles) {
-        await supabase
-          .from('routes')
-          .update({ area_sq_miles: areaSqMiles })
-          .eq('id', routeId);
+      // Backfill columns added after initial schema
+      const backfill = {};
+      if (!existing.area_sq_miles) backfill.area_sq_miles = areaSqMiles;
+      if (!existing.route_type)    backfill.route_type    = routeType;
+      if (Object.keys(backfill).length) {
+        await supabase.from('routes').update(backfill).eq('id', routeId);
       }
       discovered.push({
         id: existing.id,
@@ -258,6 +269,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
         zoom: existing.zoom,
         color: existing.color,
         areaSqMiles: existing.area_sq_miles ?? areaSqMiles,
+        routeType: existing.route_type ?? routeType,
         discovered: true,
       });
       continue;
@@ -281,6 +293,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       zoom: 15,
       color: nextColor(),
       area_sq_miles: areaSqMiles,
+      route_type: routeType,
       active: true,
     };
 
@@ -302,6 +315,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       zoom: routeRow.zoom,
       color: routeRow.color,
       areaSqMiles,
+      routeType,
       discovered: true,
     });
 

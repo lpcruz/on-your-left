@@ -49,6 +49,7 @@ export default function Home() {
     setDiscovering(true);
     setError(null);
     setFilter('all');
+    setTypeFilter('all');
     setLocation({ coords, label });
     try {
       const found = await fetchDiscover(coords);
@@ -84,13 +85,17 @@ export default function Home() {
     setRoutes([]);
   }, []);
 
-  const [filter, setFilter] = useState('all'); // 'all' | 'empty' | 'moderate' | 'packed'
+  const [filter, setFilter] = useState('all');     // 'all' | 'empty' | 'moderate' | 'packed'
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'track' | 'trail' | 'park'
   const [legendOpen, setLegendOpen] = useState(false);
 
   const filteredRoutes = useMemo(() => {
-    if (filter === 'all') return routes;
-    return routes.filter((r) => r.status === filter);
-  }, [routes, filter]);
+    return routes.filter((r) => {
+      if (filter !== 'all' && r.status !== filter) return false;
+      if (typeFilter !== 'all' && r.routeType !== typeFilter) return false;
+      return true;
+    });
+  }, [routes, filter, typeFilter]);
 
   const liveCount = routes.filter((r) => r.source === 'live').length;
   const isLoading = locating || discovering;
@@ -100,6 +105,13 @@ export default function Home() {
     { id: 'empty',    label: '🟢 Clear now' },
     { id: 'moderate', label: '🟡 Buzzing now' },
     { id: 'packed',   label: '🔴 Packed now' },
+  ];
+
+  const TYPE_FILTERS = [
+    { id: 'all',   label: 'All types' },
+    { id: 'track', label: '🏟️ Tracks' },
+    { id: 'trail', label: '🥾 Trails' },
+    { id: 'park',  label: '🌳 Parks' },
   ];
 
   return (
@@ -150,6 +162,27 @@ export default function Home() {
         {/* Filter pills — only show when routes are loaded */}
         {!isLoading && routes.length > 0 && (
           <div className="mb-4">
+
+            {/* Type filter */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none mb-3">
+              {TYPE_FILTERS.map(({ id, label }) => {
+                const active = typeFilter === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setTypeFilter(id)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all touch-manipulation ${
+                      active
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs text-gray-400 dark:text-gray-600">Conditions right now</p>
               <button

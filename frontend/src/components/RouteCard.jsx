@@ -11,11 +11,18 @@ function staticMapUrl(center, zoom = 14) {
   return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/${lng},${lat},${zoom}/320x160?access_token=${MAPBOX_TOKEN}&attribution=false&logo=false`;
 }
 
+const ROUTE_TYPE_CONFIG = {
+  track: { emoji: '🏟️', label: 'Track' },
+  trail: { emoji: '🥾', label: 'Trail' },
+  park:  { emoji: '🌳', label: 'Park'  },
+};
+
 export default function RouteCard({ route, distance }) {
   const navigate = useNavigate();
   const cfg = getStatus(route.status);
   const isHistorical = route.source === 'historical';
   const thumb = staticMapUrl(route.center, route.zoom ?? 14);
+  const typeConfig = ROUTE_TYPE_CONFIG[route.routeType] ?? ROUTE_TYPE_CONFIG.park;
 
   const accentColor = {
     empty:    'border-l-green-500',
@@ -45,7 +52,9 @@ export default function RouteCard({ route, distance }) {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{route.shortName}</p>
-              <p className="text-sm text-gray-500 mt-0.5 truncate">{route.location}</p>
+              <p className="text-sm text-gray-500 mt-0.5 truncate">
+                <span className="mr-1">{typeConfig.emoji}</span>{route.location}
+              </p>
             </div>
             <div className="flex-shrink-0">
               <StatusBadge status={route.status} source={route.source} size="sm" />
