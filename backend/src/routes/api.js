@@ -341,10 +341,9 @@ router.post('/discover', async (req, res) => {
     ]);
 
     const nearbyKnown = allKnownRoutes.filter((r) => {
-      if (r.id.startsWith('strava-')) return false; // superseded by OSM routes
-      if (r.id.startsWith('osm-'))    return false; // handled by discoverRoutes
+      if (!r.id.startsWith('mb-')) return false; // only Mapbox-discovered routes
       const [rLng, rLat] = r.center;
-      return haversineMiles(lat, lng, rLat, rLng) <= 3; // tighter radius to stay local
+      return haversineMiles(lat, lng, rLat, rLng) <= 3;
     });
 
     // Merge: Strava results first, then any known routes not already included
