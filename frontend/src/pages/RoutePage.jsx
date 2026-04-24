@@ -198,7 +198,15 @@ export default function RoutePage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-700 pb-4">
-          Reports are anonymous and expire after 60 minutes.
+          Reports are anonymous and expire after 60 minutes.{' '}
+          <a
+            href="https://github.com/lpcruz/on-your-left/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-600 dark:hover:text-gray-500"
+          >
+            Report an issue
+          </a>
         </p>
       </main>
     </div>

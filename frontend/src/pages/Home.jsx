@@ -5,6 +5,38 @@ import RouteCard from '../components/RouteCard.jsx';
 import SearchBar from '../components/SearchBar.jsx';
 import Header from '../components/Header.jsx';
 
+const GITHUB_ISSUES = 'https://github.com/lpcruz/on-your-left/issues/new';
+
+function ExperimentalBanner({ onDismiss }) {
+  return (
+    <div className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Early access</p>
+        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+          On Your Left is experimental — crowd data is limited while we grow.{' '}
+          <a
+            href={GITHUB_ISSUES}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-medium hover:text-amber-900 dark:hover:text-amber-200"
+          >
+            Report an issue or suggest a spot
+          </a>
+        </p>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="flex-shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 touch-manipulation p-0.5"
+        aria-label="Dismiss"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function SkeletonCard() {
   return (
     <div className="w-full rounded-2xl border border-l-4 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 animate-pulse">
@@ -85,9 +117,17 @@ export default function Home() {
     setRoutes([]);
   }, []);
 
-  const [filter, setFilter] = useState('all');     // 'all' | 'empty' | 'moderate' | 'packed'
-  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'track' | 'trail' | 'park'
+  const [filter, setFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [legendOpen, setLegendOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => localStorage.getItem('oyl-banner-dismissed') === '1'
+  );
+
+  function dismissBanner() {
+    localStorage.setItem('oyl-banner-dismissed', '1');
+    setBannerDismissed(true);
+  }
 
   const filteredRoutes = useMemo(() => {
     return routes.filter((r) => {
@@ -119,6 +159,8 @@ export default function Home() {
       <Header />
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
+        {!bannerDismissed && <ExperimentalBanner onDismiss={dismissBanner} />}
+
         <SearchBar
           onLocationSelect={handleLocationSelect}
           onClear={handleClear}
