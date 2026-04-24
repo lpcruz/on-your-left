@@ -250,11 +250,13 @@ function requireAdmin(req, res, next) {
 
 // POST /api/admin/routes — add a new route
 router.post('/admin/routes', adminLimiter, requireAdmin, async (req, res) => {
-  const { id, name, shortName, description, location, center, zoom = 14, color = '#6366f1' } = req.body;
+  const { id, name, shortName, description, location, center, zoom = 14, color = '#6366f1', routeType = 'park', areaSqMiles } = req.body;
 
   if (!id || !name || !shortName || !center || center.length !== 2) {
     return res.status(400).json({ error: 'Required: id, name, shortName, center ([lng, lat])' });
   }
+
+  const VALID_TYPES = new Set(['park', 'track', 'trail']);
 
   const { data, error } = await supabase
     .from('routes')
@@ -268,6 +270,8 @@ router.post('/admin/routes', adminLimiter, requireAdmin, async (req, res) => {
       center_lat: center[1],
       zoom,
       color,
+      route_type: VALID_TYPES.has(routeType) ? routeType : 'park',
+      area_sq_miles: areaSqMiles ?? null,
       active: true,
     })
     .select()
@@ -286,7 +290,7 @@ router.post('/admin/routes', adminLimiter, requireAdmin, async (req, res) => {
 // PATCH /api/admin/routes/:routeId — update or deactivate a route
 router.patch('/admin/routes/:routeId', adminLimiter, requireAdmin, async (req, res) => {
   const { routeId } = req.params;
-  const allowed = ['name', 'short_name', 'description', 'location', 'zoom', 'color', 'active'];
+  const allowed = ['name', 'short_name', 'description', 'location', 'zoom', 'color', 'route_type', 'area_sq_miles', 'active'];
   const updates = Object.fromEntries(
     Object.entries(req.body).filter(([k]) => allowed.includes(k))
   );
