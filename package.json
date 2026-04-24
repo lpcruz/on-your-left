@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=18.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
@@ -11,7 +11,7 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
     "start": "node backend/src/server.js",
-    "heroku-postbuild": "npm install --prefix frontend && npm run build --prefix frontend && npm install --prefix backend",
+    "heroku-postbuild": "npm install --prefix frontend --include=dev && npm run build --prefix frontend && npm install --prefix backend",
     "db:setup": "npm run db:setup --prefix backend",
     "db:seed": "npm run db:seed --prefix backend",
     "strava:auth": "npm run strava:auth --prefix backend",
