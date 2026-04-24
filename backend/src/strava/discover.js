@@ -99,7 +99,8 @@ function parkSegmentType(park) {
 function parkRouteType(park) {
   const cat = (park.category ?? '').toLowerCase();
   const name = (park.name ?? '').toLowerCase();
-  if (cat.includes('track') || name.includes('track')) return 'track';
+  if (cat.includes('track') || name.includes('track') || name.includes('stadium') || name.includes('athletic')) return 'track';
+  if (cat.includes('sports') || cat.includes('recreation') || name.includes('field') || name.includes('complex')) return 'track';
   if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail') || name.includes('trail')) return 'trail';
   return 'park';
 }

@@ -59,27 +59,46 @@ function estimateAreaSqMiles(bbox, category = 'park') {
   return 0.3; // typical neighborhood park
 }
 
-// Find parks and recreational areas near a coordinate using Mapbox Search Box API
+// Categories to search — park covers general parks, the others catch school tracks,
+// athletic fields, sports complexes, and recreational facilities.
+const PARK_CATEGORIES = ['park', 'recreation_area', 'sports_facility'];
+
+async function fetchCategory(category, lng, lat) {
+  const url = new URL(`https://api.mapbox.com/search/searchbox/v1/category/${category}`);
+  url.searchParams.set('access_token', MAPBOX_TOKEN);
+  url.searchParams.set('proximity', `${lng},${lat}`);
+  url.searchParams.set('limit', '10');
+  url.searchParams.set('language', 'en');
+
+  const res = await fetch(url.toString());
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.features ?? [];
+}
+
+// Find parks, tracks, and recreational areas near a coordinate using Mapbox Search Box API
 export async function findParksNear(lng, lat) {
   if (!MAPBOX_TOKEN) return [];
   try {
-    const url = new URL('https://api.mapbox.com/search/searchbox/v1/category/park');
-    url.searchParams.set('access_token', MAPBOX_TOKEN);
-    url.searchParams.set('proximity', `${lng},${lat}`);
-    url.searchParams.set('limit', '10');
-    url.searchParams.set('language', 'en');
+    const results = await Promise.all(
+      PARK_CATEGORIES.map((cat) => fetchCategory(cat, lng, lat).catch(() => []))
+    );
 
-    const res = await fetch(url.toString());
-    if (!res.ok) return [];
-    const data = await res.json();
+    const seen = new Set();
+    const parks = [];
 
-    return (data.features ?? [])
-      .filter((f) => f.properties?.name && f.geometry?.coordinates)
-      .map((f) => {
+    for (const features of results) {
+      for (const f of features) {
+        if (!f.properties?.name || !f.geometry?.coordinates) continue;
+        // Deduplicate by mapbox_id, fall back to name slug
+        const key = f.properties.mapbox_id ?? f.properties.name.toLowerCase().replace(/\s+/g, '-');
+        if (seen.has(key)) continue;
+        seen.add(key);
+
         const category = f.properties.poi_category?.[0] ?? 'park';
         const bbox = f.properties.bbox ?? null;
         const areaSqMiles = estimateAreaSqMiles(bbox, category);
-        return {
+        parks.push({
           name: f.properties.name,
           lat: f.geometry.coordinates[1],
           lng: f.geometry.coordinates[0],
@@ -87,8 +106,16 @@ export async function findParksNear(lng, lat) {
           category,
           address: f.properties.place_formatted ?? '',
           areaSqMiles,
-        };
-      });
+        });
+      }
+    }
+
+    // Sort by proximity (Mapbox returns results ordered per category, not globally)
+    return parks
+      .map((p) => ({ ...p, _dist: (p.lat - lat) ** 2 + (p.lng - lng) ** 2 }))
+      .sort((a, b) => a._dist - b._dist)
+      .map(({ _dist, ...p }) => p)
+      .slice(0, 15); // cap total results
   } catch {
     return [];
   }
