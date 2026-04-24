@@ -137,7 +137,7 @@ export default function RoutePage() {
           ) : (
             <>
               <p className={`text-3xl font-black mt-1 ${cfg.color}`}>
-                {cfg.emoji} {cfg.label}
+                {cfg.label}
               </p>
               <p className={`text-sm font-medium mt-0.5 ${cfg.color} opacity-80`}>
                 {cfg.description}
@@ -152,7 +152,7 @@ export default function RoutePage() {
 
         {/* Report section */}
         <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-          <h2 className="font-bold text-gray-900 dark:text-gray-200 mb-4">🏃 Report conditions</h2>
+          <h2 className="font-bold text-gray-900 dark:text-gray-200 mb-4">Report conditions</h2>
           {submitError && (
             <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
               {submitError}

@@ -118,16 +118,16 @@ export default function Home() {
 
   const FILTERS = [
     { id: 'all',      label: 'All' },
-    { id: 'empty',    label: '🟢 Clear now' },
-    { id: 'moderate', label: '🟡 Buzzing now' },
-    { id: 'packed',   label: '🔴 Packed now' },
+    { id: 'empty',    label: 'Clear now' },
+    { id: 'moderate', label: 'Buzzing now' },
+    { id: 'packed',   label: 'Packed now' },
   ];
 
   const TYPE_FILTERS = [
     { id: 'all',   label: 'All types' },
-    { id: 'track', label: '🏟️ Tracks' },
-    { id: 'trail', label: '🥾 Trails' },
-    { id: 'park',  label: '🌳 Parks' },
+    { id: 'track', label: 'Tracks' },
+    { id: 'trail', label: 'Trails' },
+    { id: 'park',  label: 'Parks' },
   ];
 
   return (
@@ -213,7 +213,7 @@ export default function Home() {
               <div className="mb-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                   <div key={key} className="flex items-start gap-3 px-4 py-3">
-                    <span className="text-base leading-none mt-0.5">{cfg.emoji}</span>
+                    <span className={`mt-1.5 flex-shrink-0 w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
                     <div>
                       <p className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cfg.description}</p>

@@ -12,9 +12,9 @@ function staticMapUrl(center, zoom = 14) {
 }
 
 const ROUTE_TYPE_CONFIG = {
-  track: { emoji: '🏟️', label: 'Track' },
-  trail: { emoji: '🥾', label: 'Trail' },
-  park:  { emoji: '🌳', label: 'Park'  },
+  track: { label: 'Track' },
+  trail: { label: 'Trail' },
+  park:  { label: 'Park'  },
 };
 
 export default function RouteCard({ route, distance }) {
@@ -53,7 +53,7 @@ export default function RouteCard({ route, distance }) {
             <div className="min-w-0">
               <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">{route.shortName}</p>
               <p className="text-sm text-gray-500 mt-0.5 truncate">
-                <span className="mr-1">{typeConfig.emoji}</span>{route.location}
+                <span className="mr-1.5 text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wide">{typeConfig.label}</span>{route.location}
               </p>
             </div>
             <div className="flex-shrink-0">
