@@ -53,7 +53,7 @@ async function stravaGet(path, params = {}) {
 // Queries Strava segments inside the park bbox and aggregates their stats
 // to produce a single popularity score — never exposes segments as routes.
 
-async function getParkPopularity(lat, lng) {
+export async function getParkPopularity(lat, lng) {
   const R = 0.009; // ~0.6 mile bounding box
   const bounds = [lat - R, lng - R, lat + R, lng + R].join(',');
 
@@ -181,6 +181,8 @@ function timeIntensity(day, hour, type = 'route') {
 
 // Parks with no Strava data (score=0) are unknown — treat them as low-activity
 // so they default toward Clear. Only confirmed running parks tip into Buzzing/Packed.
+// Exception: tracks (sprint type) are purpose-built running surfaces, so they
+// get a minimum score so they never show as permanently Clear.
 function intensityToStatus(intensity, popularityScore, density) {
   if (intensity <= 0.05) return 'empty';
 
@@ -201,8 +203,12 @@ function intensityToStatus(intensity, popularityScore, density) {
   return 'packed';
 }
 
-function buildTypicalRows(routeId, popularityScore, areaSqMiles = 0.3, type = 'route') {
-  const density = computeDensity(popularityScore, areaSqMiles);
+export function buildTypicalRows(routeId, popularityScore, areaSqMiles = 0.3, type = 'route') {
+  // Tracks are purpose-built running surfaces — give them a floor score so they
+  // don't permanently show as Clear just because Strava has no nearby segments.
+  const MIN_TRACK_SCORE = 150;
+  const effectiveScore = (type === 'sprint' && popularityScore === 0) ? MIN_TRACK_SCORE : popularityScore;
+  const density = computeDensity(effectiveScore, areaSqMiles);
   const rows = [];
   for (let day = 0; day <= 6; day++) {
     for (let hour = 0; hour <= 23; hour++) {
@@ -210,7 +216,7 @@ function buildTypicalRows(routeId, popularityScore, areaSqMiles = 0.3, type = 'r
         route_id: routeId,
         day_of_week: day,
         hour_of_day: hour,
-        status: intensityToStatus(timeIntensity(day, hour, type), popularityScore, density),
+        status: intensityToStatus(timeIntensity(day, hour, type), effectiveScore, density),
       });
     }
   }

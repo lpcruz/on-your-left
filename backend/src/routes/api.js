@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import supabase from '../db/client.js';
 import { getRoutes, invalidateCache } from './routeStore.js';
-import { discoverRoutes } from '../strava/discover.js';
+import { discoverRoutes, getParkPopularity, buildTypicalRows } from '../strava/discover.js';
 
 const router = Router();
 
@@ -283,9 +283,28 @@ router.post('/admin/routes', adminLimiter, requireAdmin, async (req, res) => {
   }
 
   invalidateCache();
-  console.log(`✅ New route added: ${id}`);
+  console.log(`✅ New route added: ${id} — seeding typical_crowds from Strava…`);
+
+  // Seed typical_crowds in the background so the response isn't delayed
+  seedTypicalCrowds(id, center[1], center[0], routeType, areaSqMiles ?? null).catch(err =>
+    console.error(`⚠️  typical_crowds seed failed for ${id}:`, err.message)
+  );
+
   res.status(201).json({ route: data });
 });
+
+// Seed typical_crowds for a route using its Strava popularity
+async function seedTypicalCrowds(routeId, lat, lng, routeType, areaSqMiles) {
+  const { score: popularityScore } = await getParkPopularity(lat, lng);
+  const segType = routeType === 'track' ? 'sprint' : routeType === 'trail' ? 'hill' : 'route';
+  const area = areaSqMiles ?? (routeType === 'track' ? 0.02 : routeType === 'trail' ? 0.5 : 0.3);
+  const rows = buildTypicalRows(routeId, popularityScore, area, segType);
+  const { error } = await supabase
+    .from('typical_crowds')
+    .upsert(rows, { onConflict: 'route_id,day_of_week,hour_of_day' });
+  if (error) throw new Error(error.message);
+  console.log(`✅ typical_crowds seeded for ${routeId} (score=${popularityScore}, type=${segType})`);
+}
 
 // PATCH /api/admin/routes/:routeId — update or deactivate a route
 router.patch('/admin/routes/:routeId', adminLimiter, requireAdmin, async (req, res) => {
@@ -310,6 +329,28 @@ router.patch('/admin/routes/:routeId', adminLimiter, requireAdmin, async (req, r
 
   invalidateCache();
   res.json({ route: data });
+});
+
+// POST /api/admin/routes/:routeId/reseed — re-fetch Strava data and rebuild typical_crowds
+router.post('/admin/routes/:routeId/reseed', adminLimiter, requireAdmin, async (req, res) => {
+  const { routeId } = req.params;
+
+  const { data: route, error: fetchErr } = await supabase
+    .from('routes')
+    .select('center_lat, center_lng, route_type, area_sq_miles')
+    .eq('id', routeId)
+    .single();
+
+  if (fetchErr || !route) {
+    return res.status(404).json({ error: `Route '${routeId}' not found` });
+  }
+
+  try {
+    await seedTypicalCrowds(routeId, route.center_lat, route.center_lng, route.route_type ?? 'park', route.area_sq_miles);
+    res.json({ ok: true, message: `typical_crowds reseeded for ${routeId}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Haversine distance in miles between two [lat, lng] pairs
