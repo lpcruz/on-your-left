@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 const AuthContext = createContext(null);
 
-const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001';
+const API = import.meta.env.VITE_API_BASE ?? '';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = loading, null = logged out

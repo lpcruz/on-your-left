@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeContext } from '../App.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001';
+const API = import.meta.env.VITE_API_BASE ?? '';
 
 function SunIcon() {
   return (

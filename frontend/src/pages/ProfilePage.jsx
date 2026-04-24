@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Header from '../components/Header.jsx';
 
-const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001';
+const API = import.meta.env.VITE_API_BASE ?? '';
 
 export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
