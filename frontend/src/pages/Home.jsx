@@ -321,7 +321,15 @@ export default function Home() {
 
         {routes.length > 0 && (
           <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-700 leading-relaxed">
-            Reports expire after 4 hours.{'\n'}Tap a route to check conditions or submit a report.
+            Reports expire after 4 hours. Tap a route to check conditions or submit a report.{' '}
+            <a
+              href={GITHUB_ISSUES}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-600 dark:hover:text-gray-500"
+            >
+              Report an issue
+            </a>
           </p>
         )}
       </main>
