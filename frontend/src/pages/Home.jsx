@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { getStatus, STATUS_CONFIG } from '../lib/status.js';
 import { distanceMiles, getCurrentPosition, findParksNear } from '../lib/geo.js';
 import RouteCard from '../components/RouteCard.jsx';
+import AddSpotCard from '../components/AddSpotCard.jsx';
 import SearchBar from '../components/SearchBar.jsx';
 import Header from '../components/Header.jsx';
 
@@ -37,20 +38,22 @@ async function fetchDiscover(coords) {
 }
 
 export default function Home() {
-  // null = locating, false = denied/failed, { coords, label } = resolved
+  // null = locating, false = denied/failed, { coords, label, place? } = resolved
   const [location, setLocation] = useState(null);
   const [locating, setLocating] = useState(true);
+  const [selectedPlace, setSelectedPlace] = useState(null); // place from geocoding search
 
   const [routes, setRoutes] = useState([]);
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState(null);
 
-  const discover = useCallback(async (coords, label) => {
+  const discover = useCallback(async (coords, label, place = null) => {
     setDiscovering(true);
     setError(null);
     setFilter('all');
     setTypeFilter('all');
-    setLocation({ coords, label });
+    setSelectedPlace(place);
+    setLocation({ coords, label, place });
     try {
       const found = await fetchDiscover(coords);
       const withDist = found
@@ -76,13 +79,14 @@ export default function Home() {
   }, [discover]);
 
   const handleLocationSelect = useCallback(
-    ({ coords, label }) => discover(coords, label),
+    ({ coords, label, place }) => discover(coords, label, place ?? null),
     [discover],
   );
 
   const handleClear = useCallback(() => {
     setLocation(false);
     setRoutes([]);
+    setSelectedPlace(null);
   }, []);
 
   const [filter, setFilter] = useState('all');     // 'all' | 'empty' | 'moderate' | 'packed'
@@ -99,6 +103,18 @@ export default function Home() {
 
   const liveCount = routes.filter((r) => r.source === 'live').length;
   const isLoading = locating || discovering;
+
+  // Show "Add this spot" card when the user searched a specific place that
+  // isn't already in the discovered results (within 0.25 miles)
+  const showAddCard = !isLoading && selectedPlace && !routes.some((r) =>
+    distanceMiles([selectedPlace.lng, selectedPlace.lat], r.center) < 0.25
+  );
+
+  function handleSpotAdded(newRoute) {
+    const withDist = { ...newRoute, distance: distanceMiles(location.coords, newRoute.center) };
+    setRoutes((prev) => [withDist, ...prev]);
+    setSelectedPlace(null);
+  }
 
   const FILTERS = [
     { id: 'all',      label: 'All' },
@@ -249,6 +265,9 @@ export default function Home() {
         )}
 
         <div className="space-y-3">
+          {showAddCard && (
+            <AddSpotCard place={selectedPlace} onAdded={handleSpotAdded} />
+          )}
           {isLoading
             ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             : location === false && routes.length === 0
