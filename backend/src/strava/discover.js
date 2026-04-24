@@ -242,14 +242,21 @@ function nextColor() { return COLORS[colorIdx++ % COLORS.length]; }
 // ─── Main discovery function ──────────────────────────────────────────────────
 
 // frontendParks: [{ name, lat, lng, category, address, mapboxId }]
-// How long before we re-check Strava for an existing route (30 days)
+// How long before we re-check Strava for a route that already has data (30 days).
+// Routes with strava_fetched_at=NULL are never auto-refreshed during discovery —
+// they must be explicitly reseeded via /api/admin/routes/:id/reseed.
 const STRAVA_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Max new-park Strava fetches per discoverRoutes call.
+// Each new park costs up to 3 API calls; cap at 2 to stay well within 100/15min.
+const MAX_STRAVA_FETCHES_PER_DISCOVERY = 2;
 
 export async function discoverRoutes(lat, lng, frontendParks = []) {
   const parks = frontendParks;
   if (!parks.length) return [];
 
   const discovered = [];
+  let stravaFetchesThisCall = 0;
 
   for (const park of parks.slice(0, 8)) {
     const routeId = `mb-${park.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 46)}`;
@@ -271,30 +278,26 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       if (existing.area_sq_miles == null) backfill.area_sq_miles = areaSqMiles;
       if (existing.route_type == null)    backfill.route_type    = routeType;
 
-      // Re-seed typical_crowds only if Strava cache is stale or missing
-      const cacheAge = existing.strava_fetched_at
+      // Only refresh if the route has previously been fetched AND the data is stale.
+      // NULL strava_fetched_at means "never fetched" — skip during discovery,
+      // use the reseed endpoint to populate those on demand.
+      const prevFetch = existing.strava_fetched_at
         ? Date.now() - new Date(existing.strava_fetched_at).getTime()
-        : Infinity;
-      const needsRefresh = cacheAge > STRAVA_CACHE_TTL_MS;
+        : null;
+      const isStale = prevFetch !== null && prevFetch > STRAVA_CACHE_TTL_MS;
 
-      let popularityScore = existing.popularity_score ?? 0;
-      let athleteCount    = existing.strava_athlete_count ?? 0;
-
-      if (needsRefresh) {
+      if (isStale && stravaFetchesThisCall < MAX_STRAVA_FETCHES_PER_DISCOVERY) {
+        stravaFetchesThisCall++;
         const result = await getParkPopularity(park.lat, park.lng);
         if (!result.rateLimited) {
-          popularityScore = result.score;
-          athleteCount    = result.athleteCount;
-          backfill.popularity_score      = popularityScore;
-          backfill.strava_athlete_count  = athleteCount;
+          backfill.popularity_score      = result.score;
+          backfill.strava_athlete_count  = result.athleteCount;
           backfill.strava_fetched_at     = new Date().toISOString();
-          console.log(`🔄 Strava refresh for ${routeId}: score=${popularityScore}`);
+          console.log(`🔄 Strava refresh for ${routeId}: score=${result.score}`);
 
-          // Re-seed typical_crowds with fresh data
-          const typicalRows = buildTypicalRows(routeId, popularityScore, existing.area_sq_miles ?? areaSqMiles, type);
+          const typicalRows = buildTypicalRows(routeId, result.score, existing.area_sq_miles ?? areaSqMiles, type);
           await supabase.from('typical_crowds').upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });
         }
-        // If rate limited, skip refresh — use cached score as-is
       }
 
       if (Object.keys(backfill).length) {
@@ -318,7 +321,15 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
     }
 
     // ── New route — fetch Strava and insert ───────────────────────────────────
-    const { score: popularityScore, athleteCount, rateLimited } = await getParkPopularity(park.lat, park.lng);
+    // Only call Strava if we haven't hit the per-discovery cap.
+    // If capped, insert with null score — reseed endpoint can populate later.
+    let popularityScore = 0, athleteCount = 0, rateLimited = false;
+    if (stravaFetchesThisCall < MAX_STRAVA_FETCHES_PER_DISCOVERY) {
+      stravaFetchesThisCall++;
+      ({ score: popularityScore, athleteCount, rateLimited } = await getParkPopularity(park.lat, park.lng));
+    } else {
+      console.log(`⏭  Skipping Strava for new park ${routeId} (fetch cap reached)`);
+    }
 
     const typicalRows = buildTypicalRows(routeId, popularityScore, areaSqMiles, type);
     await supabase.from('typical_crowds').upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });

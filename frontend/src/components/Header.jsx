@@ -1,5 +1,9 @@
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeContext } from '../App.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+
+const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001';
 
 function SunIcon() {
   return (
@@ -19,9 +23,69 @@ function MoonIcon() {
   );
 }
 
+function UserMenu({ user, logout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
+        aria-label="User menu"
+      >
+        {user.profile_photo ? (
+          <img
+            src={user.profile_photo}
+            alt={user.firstname}
+            className="w-7 h-7 rounded-full object-cover ring-2 ring-orange-500"
+          />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
+            {user.firstname?.[0] ?? '?'}
+          </div>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-10 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{user.name}</p>
+            {user.city && (
+              <p className="text-xs text-gray-500 truncate">{[user.city, user.state].filter(Boolean).join(', ')}</p>
+            )}
+          </div>
+          <button
+            onClick={() => { setOpen(false); navigate('/profile'); }}
+            className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Your profile
+          </button>
+          <button
+            onClick={() => { setOpen(false); logout(); }}
+            className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          >
+            Disconnect Strava
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header({ title, showBack = false }) {
   const navigate = useNavigate();
   const { isDark, toggle } = useThemeContext();
+  const { user, loading, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 safe-top">
@@ -56,13 +120,31 @@ export default function Header({ title, showBack = false }) {
           )}
         </div>
 
-        <button
-          onClick={toggle}
-          className="p-2 rounded-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
-          aria-label="Toggle theme"
-        >
-          {isDark ? <SunIcon /> : <MoonIcon />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggle}
+            className="p-2 rounded-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
+            aria-label="Toggle theme"
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+
+          {!loading && (
+            user ? (
+              <UserMenu user={user} logout={logout} />
+            ) : (
+              <a
+                href={`${API}/auth/strava`}
+                className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors touch-manipulation whitespace-nowrap"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+                </svg>
+                Connect
+              </a>
+            )
+          )}
+        </div>
       </div>
     </header>
   );
