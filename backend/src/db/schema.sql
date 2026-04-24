@@ -23,6 +23,26 @@ ALTER TABLE routes ADD COLUMN IF NOT EXISTS popularity_score DOUBLE PRECISION;
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS strava_athlete_count INTEGER;
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS strava_fetched_at TIMESTAMPTZ;
 
+CREATE TABLE IF NOT EXISTS users (
+  id                SERIAL PRIMARY KEY,
+  strava_athlete_id BIGINT UNIQUE NOT NULL,
+  name              TEXT NOT NULL,
+  firstname         TEXT,
+  lastname          TEXT,
+  profile_photo     TEXT,
+  city              TEXT,
+  state             TEXT,
+  country           TEXT,
+  access_token      TEXT NOT NULL,
+  refresh_token     TEXT NOT NULL,
+  token_expires_at  BIGINT NOT NULL,  -- Unix timestamp
+  scope             TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_strava_athlete_id ON users (strava_athlete_id);
+
 CREATE TABLE IF NOT EXISTS crowd_reports (
   id          SERIAL PRIMARY KEY,
   route_id    VARCHAR(50) NOT NULL,
