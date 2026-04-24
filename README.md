@@ -1,29 +1,22 @@
-# on-your-left
-it's giving...waze for runners
+# On Your Left
+Waze for runners. Know how crowded a route is before you show up.
 
-## The Problem
-There is no single API that tracks foot traffic on public multi-use paths. That means you don't know if a route is runnable until you actually get there. Because trying to lock in that 2:50 to 2:55 marathon finish pace while dodging rogue dog leashes, side-by-side strollers, and six-person walking groups is a literal nightmare. 
+## What is this?
+You know that feeling when you show up to run and the path is shoulder-to-shoulder with strollers, dog walkers, and people walking five-wide with headphones in? Yeah. This fixes that.
 
-## The Solution
-`on-your-left` is a hyper-local, Waze-style webapp built to solve the cold-start data problem for runner traffic. It combines frictionless real-time crowdsourcing with a fallback of historical API data to tell you exactly how packed a route is *before* you show up.
+On Your Left is a crowdsourced crowd tracker for running routes. Runners report conditions in real time — Clear, Buzzing, or Packed — and we blend that with historical data so the app is never empty.
 
-## MVP Scope
-Version 1.0 focuses exclusively on four major choke-point routes in Bergen and Hudson Counties to ensure data density during our beta tests:
-1. Hoboken / Weehawken Waterfront
-2. Liberty State Park Promenade
-3. Saddle River County Park (Ridgewood/Duck Pond)
-4. Overpeck County Park (Leonia Loops)
+## How it works
+- Auto-detects your location and shows nearby parks, tracks, and trails
+- Each route shows its current crowd status based on real reports from the last 4 hours
+- No accounts, no friction — tap a button and go
+- Falls back to estimated conditions (based on Strava data + time of day) when there are no recent reports
 
-## Core Features
-* **The "Sweaty-Finger" UI:** Anonymous, zero-friction reporting. Three massive buttons (🟢 Empty, 🟡 Moderate, 🔴 Packed) so you don't have to break stride to report the crowd.
-* **Rolling Time-Decay:** The map color reflects a live 60-minute rolling average of user reports. 
-* **The "Typically..." Fallback:** If live data expires, the app surfaces pre-calculated historical segment data (via the Strava API) so the map is never blank.
+## Stack
+React + Vite, Node/Express, PostgreSQL (Supabase), Mapbox, Strava API — deployed on Heroku.
 
-## Tech Stack (Planned)
-* **Frontend:** React / Mapbox GL JS 
-* **Backend:** Node.js / Express
-* **Database:** PostgreSQL 
-* **Historical Data:** Strava API (Segment Efforts)
+## Live
+[on-your-left-9393087aafb0.herokuapp.com](https://on-your-left-9393087aafb0.herokuapp.com)
 
-## Contributing
-If you are tired of yelling "On your left!" at people wearing noise-canceling headphones, feel free to submit a pull request.
+## Feedback
+If you found a bug, a missing route, or just want to tell us the path was absolutely packed — [open an issue](https://github.com/lpcruz/on-your-left/issues/new).
