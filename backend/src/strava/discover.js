@@ -236,11 +236,18 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
     // Check if already in DB
     const { data: existing } = await supabase
       .from('routes')
-      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color')
+      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color, area_sq_miles')
       .eq('id', routeId)
       .single();
 
     if (existing) {
+      // Backfill area_sq_miles if the row pre-dates the column
+      if (!existing.area_sq_miles) {
+        await supabase
+          .from('routes')
+          .update({ area_sq_miles: areaSqMiles })
+          .eq('id', routeId);
+      }
       discovered.push({
         id: existing.id,
         name: existing.name,
