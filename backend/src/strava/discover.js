@@ -42,6 +42,10 @@ async function stravaGet(path, params = {}) {
   const url = new URL(`https://www.strava.com/api/v3${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 429) {
+    console.warn('⚠️  Strava rate limit hit — using cached data where available');
+    throw new Error('Strava 429: rate limit exceeded');
+  }
   if (!res.ok) throw new Error(`Strava ${res.status}`);
   return res.json();
 }
@@ -53,6 +57,8 @@ async function stravaGet(path, params = {}) {
 // Queries Strava segments inside the park bbox and aggregates their stats
 // to produce a single popularity score — never exposes segments as routes.
 
+// Fetch Strava popularity for a location.
+// Uses at most 3 API calls (1 explore + 2 segment details) to stay within rate limits.
 export async function getParkPopularity(lat, lng) {
   const R = 0.009; // ~0.6 mile bounding box
   const bounds = [lat - R, lng - R, lat + R, lng + R].join(',');
@@ -60,11 +66,12 @@ export async function getParkPopularity(lat, lng) {
   try {
     const data = await stravaGet('/segments/explore', { bounds, activity_type: 'running' });
     const segments = data.segments ?? [];
-    if (!segments.length) return { score: 0, athleteCount: 0 };
+    if (!segments.length) return { score: 0, athleteCount: 0, rateLimited: false };
 
     let totalAthletes = 0, totalEfforts = 0, totalStars = 0;
 
-    for (const seg of segments.slice(0, 4)) {
+    // Only detail the top 2 segments to minimise rate-limit usage (was 4)
+    for (const seg of segments.slice(0, 2)) {
       try {
         const detail = await stravaGet(`/segments/${seg.id}`);
         totalAthletes += detail.athlete_count ?? 0;
@@ -79,9 +86,12 @@ export async function getParkPopularity(lat, lng) {
     return {
       score: computePopularityScore({ effort_count: totalEfforts, athlete_count: totalAthletes, star_count: totalStars }),
       athleteCount: totalAthletes,
+      rateLimited: false,
     };
-  } catch {
-    return { score: 0, athleteCount: 0 };
+  } catch (err) {
+    const rateLimited = err.message.includes('429');
+    if (!rateLimited) console.warn('Strava error:', err.message);
+    return { score: 0, athleteCount: 0, rateLimited };
   }
 }
 
@@ -232,6 +242,9 @@ function nextColor() { return COLORS[colorIdx++ % COLORS.length]; }
 // ─── Main discovery function ──────────────────────────────────────────────────
 
 // frontendParks: [{ name, lat, lng, category, address, mapboxId }]
+// How long before we re-check Strava for an existing route (30 days)
+const STRAVA_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export async function discoverRoutes(lat, lng, frontendParks = []) {
   const parks = frontendParks;
   if (!parks.length) return [];
@@ -241,32 +254,53 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
   for (const park of parks.slice(0, 8)) {
     const routeId = `mb-${park.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 46)}`;
 
-    // Always refresh popularity / re-seed typical_crowds
-    const { score: popularityScore, athleteCount } = await getParkPopularity(park.lat, park.lng);
     const type = parkSegmentType(park);
     const routeType = parkRouteType(park);
     const areaSqMiles = park.areaSqMiles ?? 0.3;
-    const typicalRows = buildTypicalRows(routeId, popularityScore, areaSqMiles, type);
 
-    await supabase
-      .from('typical_crowds')
-      .upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });
-
-    // Check if already in DB
+    // ── Check if already in DB ────────────────────────────────────────────────
     const { data: existing } = await supabase
       .from('routes')
-      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color, area_sq_miles, route_type')
+      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color, area_sq_miles, route_type, popularity_score, strava_athlete_count, strava_fetched_at')
       .eq('id', routeId)
       .single();
 
     if (existing) {
-      // Backfill columns added after initial schema
+      // Backfill schema columns added after initial insert
       const backfill = {};
-      if (!existing.area_sq_miles) backfill.area_sq_miles = areaSqMiles;
-      if (!existing.route_type)    backfill.route_type    = routeType;
+      if (existing.area_sq_miles == null) backfill.area_sq_miles = areaSqMiles;
+      if (existing.route_type == null)    backfill.route_type    = routeType;
+
+      // Re-seed typical_crowds only if Strava cache is stale or missing
+      const cacheAge = existing.strava_fetched_at
+        ? Date.now() - new Date(existing.strava_fetched_at).getTime()
+        : Infinity;
+      const needsRefresh = cacheAge > STRAVA_CACHE_TTL_MS;
+
+      let popularityScore = existing.popularity_score ?? 0;
+      let athleteCount    = existing.strava_athlete_count ?? 0;
+
+      if (needsRefresh) {
+        const result = await getParkPopularity(park.lat, park.lng);
+        if (!result.rateLimited) {
+          popularityScore = result.score;
+          athleteCount    = result.athleteCount;
+          backfill.popularity_score      = popularityScore;
+          backfill.strava_athlete_count  = athleteCount;
+          backfill.strava_fetched_at     = new Date().toISOString();
+          console.log(`🔄 Strava refresh for ${routeId}: score=${popularityScore}`);
+
+          // Re-seed typical_crowds with fresh data
+          const typicalRows = buildTypicalRows(routeId, popularityScore, existing.area_sq_miles ?? areaSqMiles, type);
+          await supabase.from('typical_crowds').upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });
+        }
+        // If rate limited, skip refresh — use cached score as-is
+      }
+
       if (Object.keys(backfill).length) {
         await supabase.from('routes').update(backfill).eq('id', routeId);
       }
+
       discovered.push({
         id: existing.id,
         name: existing.name,
@@ -277,11 +311,17 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
         zoom: existing.zoom,
         color: existing.color,
         areaSqMiles: existing.area_sq_miles ?? areaSqMiles,
-        routeType: existing.route_type ?? routeType, // preserve manually-set type
+        routeType: existing.route_type ?? routeType,
         discovered: true,
       });
       continue;
     }
+
+    // ── New route — fetch Strava and insert ───────────────────────────────────
+    const { score: popularityScore, athleteCount, rateLimited } = await getParkPopularity(park.lat, park.lng);
+
+    const typicalRows = buildTypicalRows(routeId, popularityScore, areaSqMiles, type);
+    await supabase.from('typical_crowds').upsert(typicalRows, { onConflict: 'route_id,day_of_week,hour_of_day' });
 
     const city = park.address ?? '';
     const runnerLabel = athleteCount > 0 ? `${athleteCount.toLocaleString()} Strava runners` : null;
@@ -302,6 +342,9 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
       color: nextColor(),
       area_sq_miles: areaSqMiles,
       route_type: routeType,
+      popularity_score: rateLimited ? null : popularityScore,
+      strava_athlete_count: rateLimited ? null : athleteCount,
+      strava_fetched_at: rateLimited ? null : new Date().toISOString(),
       active: true,
     };
 

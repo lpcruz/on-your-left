@@ -293,16 +293,27 @@ router.post('/admin/routes', adminLimiter, requireAdmin, async (req, res) => {
   res.status(201).json({ route: data });
 });
 
-// Seed typical_crowds for a route using its Strava popularity
+// Seed typical_crowds for a route using its Strava popularity.
+// Also caches the score + fetch timestamp in the routes table.
 async function seedTypicalCrowds(routeId, lat, lng, routeType, areaSqMiles) {
-  const { score: popularityScore } = await getParkPopularity(lat, lng);
+  const { score: popularityScore, athleteCount, rateLimited } = await getParkPopularity(lat, lng);
+
+  if (rateLimited) throw new Error('Strava rate limit hit — try again in 15 minutes');
+
   const segType = routeType === 'track' ? 'sprint' : routeType === 'trail' ? 'hill' : 'route';
   const area = areaSqMiles ?? (routeType === 'track' ? 0.02 : routeType === 'trail' ? 0.5 : 0.3);
   const rows = buildTypicalRows(routeId, popularityScore, area, segType);
-  const { error } = await supabase
-    .from('typical_crowds')
-    .upsert(rows, { onConflict: 'route_id,day_of_week,hour_of_day' });
-  if (error) throw new Error(error.message);
+
+  const [{ error: crowdErr }] = await Promise.all([
+    supabase.from('typical_crowds').upsert(rows, { onConflict: 'route_id,day_of_week,hour_of_day' }),
+    supabase.from('routes').update({
+      popularity_score: popularityScore,
+      strava_athlete_count: athleteCount,
+      strava_fetched_at: new Date().toISOString(),
+    }).eq('id', routeId),
+  ]);
+
+  if (crowdErr) throw new Error(crowdErr.message);
   console.log(`✅ typical_crowds seeded for ${routeId} (score=${popularityScore}, type=${segType})`);
 }
 
