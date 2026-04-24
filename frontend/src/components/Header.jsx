@@ -52,7 +52,7 @@ export default function Header({ title, showBack = false }) {
             {title || 'On Your Left'}
           </h1>
           {!title && (
-            <p className="text-xs text-gray-500 leading-tight">Bergen & Hudson County Routes</p>
+            <p className="text-xs text-gray-500 leading-tight">Running routes near you</p>
           )}
         </div>
 
