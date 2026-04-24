@@ -21,13 +21,6 @@ const adminLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const suggestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many spots added. Try again in a few minutes.' },
-});
 
 // Returns current day/hour in Eastern Time (all routes are in NJ/NY)
 function easternNow() {
@@ -242,65 +235,6 @@ router.post('/routes/:routeId/report', reportLimiter, async (req, res) => {
   res.status(201).json({ report: data });
 });
 
-// ─── User-suggested spots ─────────────────────────────────────────────────────
-
-// POST /api/suggest — user adds a running spot that wasn't auto-discovered
-// Body: { name, lat, lng, address, routeType }
-router.post('/suggest', suggestLimiter, async (req, res) => {
-  const { name, lat, lng, address, routeType = 'park' } = req.body;
-
-  if (!name || !lat || !lng) {
-    return res.status(400).json({ error: 'name, lat, and lng are required' });
-  }
-
-  const VALID_TYPES = new Set(['park', 'track', 'trail']);
-  const type = VALID_TYPES.has(routeType) ? routeType : 'park';
-
-  // Map routeType → Mapbox-style category so discoverRoutes picks the right curve
-  const categoryMap = { track: 'running_track', trail: 'nature_reserve', park: 'park' };
-  const areaSqMap   = { track: 0.01, trail: 1.0, park: 0.3 };
-
-  const park = {
-    name: String(name).slice(0, 100),
-    lat: parseFloat(lat),
-    lng: parseFloat(lng),
-    category: categoryMap[type],
-    address: address ?? '',
-    areaSqMiles: areaSqMap[type],
-  };
-
-  try {
-    const discovered = await discoverRoutes(park.lat, park.lng, [park]);
-    if (!discovered.length) {
-      return res.status(500).json({ error: 'Could not add spot. Try again.' });
-    }
-
-    const route = discovered[0];
-    const { dayOfWeek, hourOfDay } = easternNow();
-
-    const { data: typicalRow } = await supabase
-      .from('typical_crowds')
-      .select('status')
-      .eq('route_id', route.id)
-      .eq('day_of_week', dayOfWeek)
-      .eq('hour_of_day', hourOfDay)
-      .single();
-
-    res.status(201).json({
-      route: {
-        ...route,
-        routeType: type,
-        status: typicalRow?.status ?? 'empty',
-        source: 'historical',
-        reportCount: 0,
-        lastReportAt: null,
-      },
-    });
-  } catch (err) {
-    console.error('POST /suggest error:', err);
-    res.status(500).json({ error: 'Failed to add spot' });
-  }
-});
 
 // ─── Admin routes ─────────────────────────────────────────────────────────────
 

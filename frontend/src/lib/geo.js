@@ -27,8 +27,8 @@ export async function geocode(query, userCoords = null) {
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`
   );
   url.searchParams.set('access_token', MAPBOX_TOKEN);
-  url.searchParams.set('types', 'place,neighborhood,postcode,address,poi');
-  url.searchParams.set('limit', '5');
+  url.searchParams.set('types', 'place,neighborhood,postcode,address,poi,locality');
+  url.searchParams.set('limit', '7');
 
   // Bias results toward user's current position if known
   if (userCoords) {

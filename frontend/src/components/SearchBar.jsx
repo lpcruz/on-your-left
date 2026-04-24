@@ -50,15 +50,10 @@ export default function SearchBar({ onLocationSelect, onClear, hasLocation }) {
 
   function handleSelect(feature) {
     const [lng, lat] = feature.center;
-    const label = feature.place_name.split(',')[0];
     setQuery(feature.place_name);
     setSuggestions([]);
     setOpen(false);
-    onLocationSelect({
-      coords: [lng, lat],
-      label,
-      place: { name: label, lat, lng, address: feature.place_name },
-    });
+    onLocationSelect({ coords: [lng, lat], label: feature.place_name.split(',')[0] });
   }
 
   async function handleNearMe() {
