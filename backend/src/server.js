@@ -11,7 +11,7 @@ import apiRouter from './routes/api.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DIST = join(__dirname, '../../..', 'frontend/dist');
+const DIST = join(__dirname, '../..', 'frontend/dist');
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(helmet({
