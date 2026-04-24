@@ -393,6 +393,12 @@ router.post('/discover', async (req, res) => {
   }
 });
 
+// POST /api/admin/cache-clear — force route cache invalidation without restart
+router.post('/admin/cache-clear', adminLimiter, requireAdmin, (req, res) => {
+  invalidateCache();
+  res.json({ ok: true, message: 'Route cache cleared' });
+});
+
 // GET /api/debug
 router.get('/debug', async (req, res) => {
   const { now, dayOfWeek, hourOfDay } = easternNow();

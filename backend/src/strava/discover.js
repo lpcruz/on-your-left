@@ -249,7 +249,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
     // Check if already in DB
     const { data: existing } = await supabase
       .from('routes')
-      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color, area_sq_miles')
+      .select('id, name, short_name, description, location, center_lng, center_lat, zoom, color, area_sq_miles, route_type')
       .eq('id', routeId)
       .single();
 
@@ -271,7 +271,7 @@ export async function discoverRoutes(lat, lng, frontendParks = []) {
         zoom: existing.zoom,
         color: existing.color,
         areaSqMiles: existing.area_sq_miles ?? areaSqMiles,
-        routeType: existing.route_type ?? routeType,
+        routeType: existing.route_type ?? routeType, // preserve manually-set type
         discovered: true,
       });
       continue;
