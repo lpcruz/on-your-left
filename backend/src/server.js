@@ -36,7 +36,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // Serve built frontend in production
 if (isProd && existsSync(DIST)) {
   app.use(express.static(DIST));
-  app.get('*', (_req, res) => res.sendFile(join(DIST, 'index.html')));
+  app.get('/{*path}', (_req, res) => res.sendFile(join(DIST, 'index.html')));
 }
 
 const server = createServer(app);
