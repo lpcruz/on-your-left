@@ -34,7 +34,7 @@ function easternNow() {
 // GET /api/routes
 router.get('/routes', async (req, res) => {
   const { now, dayOfWeek, hourOfDay } = easternNow();
-  const sixtyMinAgo = new Date(now - 60 * 60 * 1000).toISOString();
+  const sixtyMinAgo = new Date(now - 4 * 60 * 60 * 1000).toISOString();
 
   try {
     const routes = await getRoutes();
@@ -94,7 +94,7 @@ router.get('/routes', async (req, res) => {
 router.get('/routes/:routeId', async (req, res) => {
   const { routeId } = req.params;
   const { now, dayOfWeek, hourOfDay } = easternNow();
-  const sixtyMinAgo = new Date(now - 60 * 60 * 1000).toISOString();
+  const sixtyMinAgo = new Date(now - 4 * 60 * 60 * 1000).toISOString();
 
   try {
     const routes = await getRoutes();
@@ -338,7 +338,7 @@ router.post('/discover', async (req, res) => {
 
   try {
     const { now, dayOfWeek, hourOfDay } = easternNow();
-    const sixtyMinAgo = new Date(now - 60 * 60 * 1000).toISOString();
+    const sixtyMinAgo = new Date(now - 4 * 60 * 60 * 1000).toISOString();
 
     // Pull nearby routes from our own DB (within 10 miles) + Strava discovery
     const [allKnownRoutes, stravaDiscovered] = await Promise.all([

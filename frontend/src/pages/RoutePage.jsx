@@ -124,7 +124,7 @@ export default function RoutePage() {
           {isHistorical ? (
             <div className="mt-3">
               <p className="text-sm text-gray-500 leading-relaxed">
-                No live reports in the last hour.{' '}
+                No live reports in the last 4 hours.{' '}
                 <span className="text-gray-600 dark:text-gray-400">
                   Typically{' '}
                   <span className={getStatus(route.typicalStatus).color}>
@@ -143,7 +143,7 @@ export default function RoutePage() {
                 {cfg.description}
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                Based on {route.reportCount} {route.reportCount === 1 ? 'report' : 'reports'} in the last hour
+                Based on {route.reportCount} {route.reportCount === 1 ? 'report' : 'reports'} in the last 4 hours
               </p>
               {route.breakdown && <BreakdownBar breakdown={route.breakdown} />}
             </>
@@ -198,7 +198,7 @@ export default function RoutePage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-700 pb-4">
-          Reports are anonymous and expire after 60 minutes.{' '}
+          Reports are anonymous and expire after 4 hours.{' '}
           <a
             href="https://github.com/lpcruz/on-your-left/issues/new"
             target="_blank"

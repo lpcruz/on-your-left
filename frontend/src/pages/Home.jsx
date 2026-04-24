@@ -321,7 +321,7 @@ export default function Home() {
 
         {routes.length > 0 && (
           <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-700 leading-relaxed">
-            Reports expire after 60 minutes.{'\n'}Tap a route to check conditions or submit a report.
+            Reports expire after 4 hours.{'\n'}Tap a route to check conditions or submit a report.
           </p>
         )}
       </main>
