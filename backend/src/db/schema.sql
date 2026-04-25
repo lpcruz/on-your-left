@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS routes (
 -- Migrations: columns added after initial schema
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS area_sq_miles DOUBLE PRECISION;
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS route_type VARCHAR(20) DEFAULT 'park';
+-- User preferences
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_describe BOOLEAN NOT NULL DEFAULT false;
+
 -- Strava popularity cache — avoids re-hitting the API on every discovery
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS popularity_score DOUBLE PRECISION;
 ALTER TABLE routes ADD COLUMN IF NOT EXISTS strava_athlete_count INTEGER;

@@ -1,5 +1,5 @@
 /**
- * Strava webhook — Phase 2
+ * Strava webhook — Phase 2 + 3
  *
  * Strava calls GET  /webhook/strava to verify the subscription (one-time).
  * Strava calls POST /webhook/strava for every event (activity create/update/delete).
@@ -10,6 +10,7 @@
  *   3. Write a strava_runs row
  *   4. Write a crowd_reports row using typical_crowds status for that day/hour
  *      → feeds the MIN_SLOT_REPORTS=3 real-data Popular Times blend
+ *   5. If user has auto_describe=true, append crowd note to activity description
  */
 import { Router } from 'express';
 import supabase from '../db/client.js';
@@ -100,7 +101,7 @@ async function handleNewActivity(stravaAthleteId, stravaActivityId) {
   // 1. Look up the user in our DB
   const { data: user } = await supabase
     .from('users')
-    .select('id, access_token, refresh_token, token_expires_at')
+    .select('id, access_token, refresh_token, token_expires_at, auto_describe')
     .eq('strava_athlete_id', stravaAthleteId)
     .single();
 
@@ -205,6 +206,46 @@ async function handleNewActivity(stravaAthleteId, stravaActivityId) {
   });
 
   console.log(`✅ Logged run: ${bestRoute.id} at ${startedAt.toISOString()} → ${crowdStatus}`);
+
+  // 7. Optionally append crowd note to Strava activity description
+  if (user.auto_describe) {
+    await appendActivityDescription(token, stravaActivityId, bestRoute, crowdStatus, startedAt, activity);
+  }
+}
+
+const STATUS_LABELS = { empty: 'Clear', moderate: 'Buzzing', packed: 'Packed' };
+const APP_URL = process.env.FRONTEND_URL ?? 'https://on-your-left-9393087aafb0.herokuapp.com';
+
+async function appendActivityDescription(token, activityId, route, crowdStatus, startedAt, activity) {
+  try {
+    const hour = new Date(startedAt.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours();
+    const timeLabel = hour < 12 ? 'this morning' : hour < 17 ? 'this afternoon' : 'this evening';
+    const statusLabel = STATUS_LABELS[crowdStatus] ?? crowdStatus;
+    const routeUrl = `${APP_URL}/route/${route.id}`;
+
+    const note = `📍 ${route.name} was ${statusLabel} ${timeLabel} · ${routeUrl}`;
+
+    const existing = activity.description ?? '';
+    const description = existing ? `${existing}\n\n${note}` : note;
+
+    const res = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ description }),
+    });
+
+    if (!res.ok) {
+      console.warn(`Could not update activity ${activityId} description: ${res.status}`);
+      return;
+    }
+
+    console.log(`✅ Updated activity ${activityId} description with crowd note`);
+  } catch (err) {
+    console.warn(`appendActivityDescription failed:`, err.message);
+  }
 }
 
 export default router;

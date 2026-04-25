@@ -131,7 +131,7 @@ router.get('/me', async (req, res) => {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, strava_athlete_id, name, firstname, lastname, profile_photo, city, state, country, last_login_at')
+      .select('id, strava_athlete_id, name, firstname, lastname, profile_photo, city, state, country, last_login_at, auto_describe')
       .eq('id', payload.userId)
       .single();
 
@@ -147,6 +147,34 @@ router.get('/me', async (req, res) => {
 router.post('/logout', (req, res) => {
   res.clearCookie('oyl_session', { ...COOKIE_OPTS, maxAge: 0 });
   res.json({ ok: true });
+});
+
+// ── PATCH /auth/preferences ───────────────────────────────────────────────────
+router.patch('/preferences', async (req, res) => {
+  const token = req.cookies?.oyl_session;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    const { auto_describe } = req.body;
+
+    if (typeof auto_describe !== 'boolean') {
+      return res.status(400).json({ error: 'auto_describe must be a boolean' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({ auto_describe })
+      .eq('id', payload.userId)
+      .select('id, auto_describe')
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ user });
+  } catch {
+    res.status(401).json({ error: 'Invalid session' });
+  }
 });
 
 export default router;
