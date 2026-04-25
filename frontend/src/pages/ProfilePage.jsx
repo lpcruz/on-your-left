@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Header from '../components/Header.jsx';
@@ -6,10 +6,28 @@ import Header from '../components/Header.jsx';
 const API = import.meta.env.VITE_API_BASE ?? '';
 
 export default function ProfilePage() {
-  const { user, loading, logout } = useAuth();
+  const { user, setUser, loading, logout } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const justConnected = params.get('auth') === 'success';
+  const [togglingDescribe, setTogglingDescribe] = useState(false);
+
+  async function toggleAutoDescribe() {
+    if (togglingDescribe) return;
+    setTogglingDescribe(true);
+    try {
+      const res = await fetch(`${API}/auth/preferences`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_describe: !user.auto_describe }),
+      });
+      const data = await res.json();
+      if (data.user) setUser((u) => ({ ...u, auto_describe: data.user.auto_describe }));
+    } finally {
+      setTogglingDescribe(false);
+    }
+  }
 
   useEffect(() => {
     if (!loading && !user) navigate('/', { replace: true });
@@ -64,22 +82,32 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Coming soon panel */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-3">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Coming soon</h2>
-          <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">1</span>
-              <span>Automatic crowd reports — when you finish a run, we'll note what the route was like so others know.</span>
+        {/* Preferences */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Preferences</h2>
+          </div>
+
+          {/* Auto-describe toggle */}
+          <div className="p-5 flex items-start gap-4">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Add crowd note to Strava</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                After each run, we'll append a line to your activity description with how busy the route was — e.g. <span className="italic">"Overpeck County Park was Buzzing this morning"</span>.
+              </p>
             </div>
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">2</span>
-              <span>Your run history matched to routes you've explored.</span>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">3</span>
-              <span>Opt-in: auto-add a crowd note to your Strava activity description.</span>
-            </div>
+            <button
+              onClick={toggleAutoDescribe}
+              disabled={togglingDescribe}
+              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors touch-manipulation ${
+                user.auto_describe ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+              aria-label="Toggle auto-describe"
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                user.auto_describe ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
           </div>
         </div>
 
