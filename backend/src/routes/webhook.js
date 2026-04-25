@@ -223,7 +223,7 @@ async function appendActivityDescription(token, activityId, route, crowdStatus, 
     const statusLabel = STATUS_LABELS[crowdStatus] ?? crowdStatus;
     const routeUrl = `${APP_URL}/route/${route.id}`;
 
-    const note = `📍 ${route.name} was ${statusLabel} ${timeLabel} · ${routeUrl}`;
+    const note = `📍 ${route.name} was showing ${statusLabel} ${timeLabel}. Accurate? Let others know: ${routeUrl}`;
 
     const existing = activity.description ?? '';
     const description = existing ? `${existing}\n\n${note}` : note;
