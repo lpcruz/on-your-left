@@ -134,7 +134,7 @@ async function handleNewActivity(stravaAthleteId, stravaActivityId) {
   // 3. Load all active routes and find the nearest one within radius
   const { data: routes } = await supabase
     .from('routes')
-    .select('id, center_lat, center_lng')
+    .select('id, name, center_lat, center_lng')
     .eq('active', true);
 
   if (!routes?.length) return;
