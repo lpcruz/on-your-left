@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Prevent Supabase client from throwing "supabaseUrl is required" in CI
+// where no .env file is present. The functions under test are pure and
+// never touch the database.
+vi.mock('../db/client.js', () => ({ default: {} }));
+
 import {
   computePopularityScore,
   intensityToStatus,
