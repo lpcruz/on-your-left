@@ -47,3 +47,4 @@ jobs:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: on-your-left-9393087aafb0
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          dont_create: true
