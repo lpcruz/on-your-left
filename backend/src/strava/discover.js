@@ -98,7 +98,7 @@ export async function getParkPopularity(lat, lng) {
 // ─── Segment type from OSM park tags ─────────────────────────────────────────
 
 // Curve type for time-of-day intensity modelling
-function parkSegmentType(park) {
+export function parkSegmentType(park) {
   const cat = (park.category ?? '').toLowerCase();
   if (cat.includes('track')) return 'sprint';
   if (cat.includes('nature') || cat.includes('reserve') || cat.includes('trail')) return 'hill';
@@ -106,7 +106,7 @@ function parkSegmentType(park) {
 }
 
 // Human-facing route type stored in the DB and shown in the UI
-function parkRouteType(park) {
+export function parkRouteType(park) {
   const cat = (park.category ?? '').toLowerCase();
   const name = (park.name ?? '').toLowerCase();
   // Only call it a track if the name/category explicitly says so
@@ -193,7 +193,7 @@ function timeIntensity(day, hour, type = 'route') {
 // so they default toward Clear. Only confirmed running parks tip into Buzzing/Packed.
 // Exception: tracks (sprint type) are purpose-built running surfaces, so they
 // get a minimum score so they never show as permanently Clear.
-function intensityToStatus(intensity, popularityScore, density) {
+export function intensityToStatus(intensity, popularityScore, density) {
   if (intensity <= 0.05) return 'empty';
 
   if (popularityScore === 0) {
